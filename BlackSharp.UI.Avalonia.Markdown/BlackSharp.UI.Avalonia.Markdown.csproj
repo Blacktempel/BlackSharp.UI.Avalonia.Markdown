@@ -29,7 +29,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="$(AssemblyName).Tests" />
     <None Include="../README.md" Pack="true" PackagePath="/" />
-    <None Include="../LICENSE-Octicons" Pack="true" PackagePath="/" />
+    <None Include="../ThirdPartyNotices" Pack="true" PackagePath="/" />
     <None Include="../Assets/BlackSharp.png" Pack="true" PackagePath="/" />
   </ItemGroup>
 </Project>
