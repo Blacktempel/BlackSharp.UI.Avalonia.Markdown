@@ -1,0 +1,87 @@
+name: Build and test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      upload_build_artifacts:
+        description: Upload the NuGet package and compiled libraries
+        required: false
+        default: true
+        type: boolean
+  workflow_call:
+    inputs:
+      upload_build_artifacts:
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up .NET SDKs
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-${{ runner.arch }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets', '**/packages.lock.json', '**/nuget.config', '**/NuGet.config', '**/NuGet.Config', '**/global.json') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-nuget-
+
+      - name: Restore
+        run: dotnet restore BlackSharp.UI.Avalonia.Markdown.slnx
+
+      - name: Build
+        run: dotnet build BlackSharp.UI.Avalonia.Markdown.slnx -c Release --no-restore
+
+      - name: Test
+        run: dotnet test BlackSharp.UI.Avalonia.Markdown.slnx -c Release --no-build --no-restore
+
+      - name: Pack NuGet package
+        if: ${{ runner.os == 'Windows' && inputs.upload_build_artifacts }}
+        id: package
+        shell: pwsh
+        run: |
+          $version = (Get-Content -LiteralPath Versions/BLACKSHARP.VERSION -Raw).Trim()
+          $directory = Join-Path $env:RUNNER_TEMP 'Markdown-NuGet'
+
+          dotnet pack BlackSharp.UI.Avalonia.Markdown/BlackSharp.UI.Avalonia.Markdown.csproj -c Release --no-build --no-restore --output $directory
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Upload NuGet package
+        if: ${{ runner.os == 'Windows' && inputs.upload_build_artifacts }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Markdown-NuGet-${{ steps.package.outputs.version }}
+          path: ${{ runner.temp }}/Markdown-NuGet/BlackSharp.UI.Avalonia.Markdown.${{ steps.package.outputs.version }}.nupkg
+          if-no-files-found: error
+
+      - name: Upload compiled libraries
+        if: ${{ runner.os == 'Windows' && inputs.upload_build_artifacts }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Markdown-Libraries-${{ steps.package.outputs.version }}
+          path: |
+            BlackSharp.UI.Avalonia.Markdown/bin/Release/net8.0/
+            BlackSharp.UI.Avalonia.Markdown/bin/Release/net10.0/
+          if-no-files-found: error

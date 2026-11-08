@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/Samples/">
+    <Project Path="Samples/BlackSharp.UI.Avalonia.Markdown.Demo/BlackSharp.UI.Avalonia.Markdown.Demo.csproj" />
+  </Folder>
+  <Folder Name="/Solution items/">
+    <File Path=".github/workflows/build.yml" />
+    <File Path=".github/workflows/release.yml" />
+    <File Path="Versions/BLACKSHARP.VERSION" />
+  </Folder>
+  <Folder Name="/Unit Tests/">
+    <Project Path="Unit Tests/BlackSharp.UI.Avalonia.Markdown.Tests/BlackSharp.UI.Avalonia.Markdown.Tests.csproj" />
+  </Folder>
+  <Project Path="BlackSharp.UI.Avalonia.Markdown/BlackSharp.UI.Avalonia.Markdown.csproj" />
+</Solution>

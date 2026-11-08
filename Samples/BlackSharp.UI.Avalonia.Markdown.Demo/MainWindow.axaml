@@ -1,0 +1,43 @@
+﻿<!-- SPDX-License-Identifier: MPL-2.0 -->
+
+<bs:DecoratedWindow xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:bs="clr-namespace:BlackSharp.UI.Avalonia.Controls;assembly=BlackSharp.UI.Avalonia"
+                    xmlns:md="clr-namespace:BlackSharp.UI.Avalonia.Markdown.Controls;assembly=BlackSharp.UI.Avalonia.Markdown"
+                    xmlns:local="using:BlackSharp.UI.Avalonia.Markdown.Demo"
+                    x:Class="BlackSharp.UI.Avalonia.Markdown.Demo.MainWindow"
+                    x:DataType="local:DemoViewModel"
+                    Theme="{StaticResource DecoratedWindowBaseTheme}"
+                    Width="1050" Height="720" MinWidth="420" MinHeight="400"
+                    WindowStartupLocation="CenterScreen"
+                    Title="BlackSharp Markdown Viewer">
+    <Grid RowDefinitions="Auto,*" Margin="20" RowSpacing="12">
+        <WrapPanel>
+            <CheckBox Content="Read-only editor" IsChecked="{Binding IsReadOnly}" Margin="0,0,16,0" />
+            <CheckBox Content="Load remote images" IsChecked="{Binding AllowRemoteImages}" />
+        </WrapPanel>
+
+        <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="12">
+            <TextBox Text="{Binding Text, Mode=TwoWay}" IsReadOnly="{Binding IsReadOnly}"
+                     AcceptsReturn="True" TextWrapping="Wrap" FontFamily="Consolas, Menlo, monospace"
+                     PlaceholderText="Enter Markdown here…" />
+            <TabControl Grid.Column="1">
+                <TabItem Header="GitHub Markdown">
+                    <md:GitHubMarkdownViewer Text="{Binding Text, Mode=OneWay}"
+                                             AllowRemoteImages="{Binding AllowRemoteImages}"
+                                             BaseUri="https://github.com/Blacktempel/BlackSharp/blob/master/"
+                                             ImageBaseUri="https://raw.githubusercontent.com/Blacktempel/BlackSharp/master/"
+                                             LinkClicked="OnLinkClicked" />
+                </TabItem>
+
+                <TabItem Header="CommonMark">
+                    <md:MarkdownViewer Text="{Binding Text, Mode=OneWay}"
+                                       AllowRemoteImages="{Binding AllowRemoteImages}"
+                                       BaseUri="https://github.com/Blacktempel/BlackSharp/blob/master/"
+                                       ImageBaseUri="https://raw.githubusercontent.com/Blacktempel/BlackSharp/master/"
+                                       LinkClicked="OnLinkClicked" />
+                </TabItem>
+            </TabControl>
+        </Grid>
+    </Grid>
+</bs:DecoratedWindow>

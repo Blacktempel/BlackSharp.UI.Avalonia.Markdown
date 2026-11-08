@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Version>$(BlackSharpVersion)</Version>
+    <Copyright>Florian K.</Copyright>
+    <Description>Native Avalonia controls for viewing and editing CommonMark and GitHub Markdown with a live preview.</Description>
+    <PackageLicenseExpression>MPL-2.0</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/Blacktempel/BlackSharp.UI.Avalonia.Markdown</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Blacktempel/BlackSharp.UI.Avalonia.Markdown</RepositoryUrl>
+    <PackageTags>avalonia;avaloniaui;markdown;commonmark;github;gfm;viewer;editor;live-preview;cross-platform</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>BlackSharp.png</PackageIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.5" />
+    <PackageReference Include="BlackSharp.Core" Version="1.2.10" />
+    <PackageReference Include="HtmlAgilityPack" Version="1.13.1" />
+    <PackageReference Include="Markdig" Version="1.6.0" />
+    <PackageReference Include="SkiaSharp" Version="3.119.4" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="$(AssemblyName).Tests" />
+    <None Include="../README.md" Pack="true" PackagePath="/" />
+    <None Include="../LICENSE-Octicons" Pack="true" PackagePath="/" />
+    <None Include="../Assets/BlackSharp.png" Pack="true" PackagePath="/" />
+  </ItemGroup>
+</Project>

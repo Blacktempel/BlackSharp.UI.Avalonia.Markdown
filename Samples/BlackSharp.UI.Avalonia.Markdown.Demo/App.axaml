@@ -1,0 +1,17 @@
+﻿<!-- SPDX-License-Identifier: MPL-2.0 -->
+
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="BlackSharp.UI.Avalonia.Markdown.Demo.App">
+    <Application.Styles>
+        <FluentTheme />
+    </Application.Styles>
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://BlackSharp.UI.Avalonia/Themes/DecoratedWindow.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>
