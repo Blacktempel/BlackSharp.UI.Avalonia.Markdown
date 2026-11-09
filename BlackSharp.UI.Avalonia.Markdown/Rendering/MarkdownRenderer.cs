@@ -148,18 +148,24 @@ namespace BlackSharp.UI.Avalonia.Markdown.Rendering
         /// </summary>
         /// <param name="target">The panel that receives the rendered blocks.</param>
         /// <param name="nodes">The nodes in document order.</param>
-        private void AddBlocks(StackPanel target, IEnumerable<HtmlNode> nodes)
+        /// <param name="taskInput">The checkbox element rendered separately from the list item body.</param>
+        private void AddBlocks(StackPanel target, IEnumerable<HtmlNode> nodes, HtmlNode? taskInput = null)
         {
             var pending = new List<HtmlNode>();
 
             // Collect inline nodes and render each block element in its own control.
             foreach (var node in nodes)
             {
+                if (ReferenceEquals(node, taskInput))
+                {
+                    continue;
+                }
+
                 if (IsBlock(node.Name))
                 {
                     FlushInlines();
 
-                    var visual = RenderBlock(node);
+                    var visual = RenderBlock(node, taskInput);
                     RegisterAnchor(node, visual);
 
                     target.Children.Add(visual);
@@ -194,8 +200,9 @@ namespace BlackSharp.UI.Avalonia.Markdown.Rendering
         /// Creates a visual for an allowed block element.
         /// </summary>
         /// <param name="node">The block element.</param>
+        /// <param name="taskInput">The checkbox element to omit from a task paragraph.</param>
         /// <returns>The rendered block.</returns>
-        private Control RenderBlock(HtmlNode node)
+        private Control RenderBlock(HtmlNode node, HtmlNode? taskInput)
         {
             switch (node.Name)
             {
@@ -215,7 +222,11 @@ namespace BlackSharp.UI.Avalonia.Markdown.Rendering
                     return heading;
                 }
                 case "p":
-                    return CreateText(node.ChildNodes, GetAlignment(node));
+                    return CreateText(
+                        ReferenceEquals(taskInput?.ParentNode, node)
+                            ? node.ChildNodes.Where(child => !ReferenceEquals(child, taskInput))
+                            : node.ChildNodes,
+                        GetAlignment(node));
                 case "pre":
                 {
                     var code = new SelectableTextBlock
@@ -347,9 +358,8 @@ namespace BlackSharp.UI.Avalonia.Markdown.Rendering
                 var body = CreateStack();
 
                 var taskInput = GetTaskInput(item);
-                taskInput?.Remove();
 
-                AddBlocks(body, item.ChildNodes);
+                AddBlocks(body, item.ChildNodes, taskInput);
 
                 Control row;
                 if (taskInput != null)

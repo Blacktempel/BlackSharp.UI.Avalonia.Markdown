@@ -82,6 +82,64 @@ namespace BlackSharp.UI.Avalonia.Markdown.Tests
         }
 
         /// <summary>
+        /// Checks that a background parse cannot replace a newer preview.
+        /// </summary>
+        [AvaloniaFact]
+        public async Task BackgroundParseDoesNotReplaceNewerSource()
+        {
+            // Arrange
+            var viewer = new MarkdownViewer
+            {
+                Text = "# Previous\n\n" + new string('a', 8192),
+            };
+
+            var window = Show(viewer);
+
+            try
+            {
+                // Act
+                viewer.Text = "# Current";
+                await WaitUntilAsync(() => Heading(viewer, "Current") != null);
+
+                // Assert
+                Assert.Null(Heading(viewer, "Previous"));
+            }
+            finally
+            {
+                window.Close();
+            }
+        }
+
+        /// <summary>
+        /// Checks that rendering a cached task list keeps its checkbox after a theme change.
+        /// </summary>
+        [AvaloniaFact]
+        public async Task ThemeChangeKeepsTaskListMarkers()
+        {
+            // Arrange
+            var viewer = new GitHubMarkdownViewer { Text = "- [x] Complete" };
+            var window = Show(viewer, ThemeVariant.Light);
+
+            try
+            {
+                var marker = Assert.Single(viewer.GetVisualDescendants().OfType<CheckBox>());
+
+                // Act
+                window.RequestedThemeVariant = ThemeVariant.Dark;
+
+                await WaitUntilAsync(() => viewer.GetVisualDescendants().OfType<CheckBox>()
+                    .Any(current => !ReferenceEquals(current, marker)));
+
+                // Assert
+                Assert.True(Assert.Single(viewer.GetVisualDescendants().OfType<CheckBox>()).IsChecked);
+            }
+            finally
+            {
+                window.Close();
+            }
+        }
+
+        /// <summary>
         /// Checks that the supplied HTML example centers the title and 128-pixel image.
         /// </summary>
         [AvaloniaFact]

@@ -10,6 +10,7 @@ using Avalonia.Threading;
 using BlackSharp.Core.Logging;
 using BlackSharp.UI.Avalonia.Markdown.Events;
 using BlackSharp.UI.Avalonia.Markdown.Rendering;
+using HtmlAgilityPack;
 
 namespace BlackSharp.UI.Avalonia.Markdown.Controls
 {
@@ -85,6 +86,11 @@ namespace BlackSharp.UI.Avalonia.Markdown.Controls
         private const int MaximumFallbackTextLength = 4096;
 
         /// <summary>
+        /// Sets the largest source length parsed synchronously, in UTF-16 code units.
+        /// </summary>
+        private const int SynchronousParseSourceLength = 4096;
+
+        /// <summary>
         /// Lays out the source editor and preview according to the available width.
         /// </summary>
         private readonly Grid _layout;
@@ -113,6 +119,26 @@ namespace BlackSharp.UI.Avalonia.Markdown.Controls
         /// Indicates that the viewer can render in a visual tree.
         /// </summary>
         private bool _isAttached;
+
+        /// <summary>
+        /// Tracks whether a document is being parsed on a background thread.
+        /// </summary>
+        private bool _isParsing;
+
+        /// <summary>
+        /// Holds the source of the last parsed document, including documents rejected by the node limit.
+        /// </summary>
+        private string? _parsedSource;
+
+        /// <summary>
+        /// Holds the Markdown dialect used for the cached document.
+        /// </summary>
+        private bool _parsedUseGitHubSyntax;
+
+        /// <summary>
+        /// Holds the cached document node, or null when the parsed document exceeds the node limit.
+        /// </summary>
+        private HtmlNode? _parsedDocument;
 
         /// <summary>
         /// Cancels assignments to image controls in the previous preview.
@@ -306,6 +332,9 @@ namespace BlackSharp.UI.Avalonia.Markdown.Controls
             _isAttached = false;
             _renderTimer.Stop();
 
+            _parsedSource   = null;
+            _parsedDocument = null;
+
             ClearPreview();
             base.OnDetachedFromVisualTree(e);
         }
@@ -355,30 +384,155 @@ namespace BlackSharp.UI.Avalonia.Markdown.Controls
         }
 
         /// <summary>
-        /// Replaces the preview with the current document, retaining requests for unchanged image destinations.
+        /// Uses a cached parse or parses the current Markdown source for the preview.
         /// </summary>
         private void Render()
         {
-            CancelPreviousPreview();
+            _renderTimer.Stop();
+
+            if (!_isAttached || _isParsing)
+            {
+                return;
+            }
+
             var text = Text ?? string.Empty;
+
+            var useGitHubSyntax = UseGitHubSyntax;
 
             if (text.Length > MaximumPreviewSourceLength)
             {
+                _parsedSource   = null;
+                _parsedDocument = null;
                 ShowPreviewLimit();
+                return;
+            }
+
+            if (_parsedUseGitHubSyntax == useGitHubSyntax && string.Equals(_parsedSource, text, StringComparison.Ordinal))
+            {
+                RenderDocument(_parsedDocument, text);
+                return;
+            }
+
+            _parsedSource   = null;
+            _parsedDocument = null;
+
+            if (text.Length > SynchronousParseSourceLength)
+            {
+                _isParsing = true;
+                _ = ParseAndRenderAsync(text, useGitHubSyntax);
                 return;
             }
 
             try
             {
-                var document = MarkdownDocumentParser.Parse(text, UseGitHubSyntax);
+                CacheAndRenderDocument(ParseDocument(text, useGitHubSyntax), text, useGitHubSyntax);
+            }
+            catch (Exception exception) when (exception is not OutOfMemoryException)
+            {
+                ShowPreviewFailure(text, exception);
+            }
+        }
 
-                // Check the document before creating controls or starting image requests.
-                if (document.Descendants().Take(MaximumPreviewNodeCount + 1).Count() > MaximumPreviewNodeCount)
+        /// <summary>
+        /// Parses one document in the background and renders it if its source and dialect still match.
+        /// </summary>
+        /// <param name="text">The source to parse.</param>
+        /// <param name="useGitHubSyntax">Whether to parse GitHub Markdown extensions.</param>
+        /// <returns>A task that completes after the dispatcher handles the parse result.</returns>
+        private async Task ParseAndRenderAsync(string text, bool useGitHubSyntax)
+        {
+            HtmlNode?  document = null;
+            Exception? error    = null;
+
+            try
+            {
+                document = await Task.Run(() => ParseDocument(text, useGitHubSyntax)).ConfigureAwait(false);
+            }
+            catch (Exception exception) when (exception is not OutOfMemoryException)
+            {
+                error = exception;
+            }
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                _isParsing = false;
+
+                if (!_isAttached)
                 {
-                    ShowPreviewLimit();
                     return;
                 }
 
+                if (!string.Equals(Text ?? string.Empty, text, StringComparison.Ordinal) || UseGitHubSyntax != useGitHubSyntax)
+                {
+                    // A timer may already be waiting for the current editor input to settle.
+                    if (!_renderTimer.IsEnabled)
+                    {
+                        Render();
+                    }
+
+                    return;
+                }
+
+                _renderTimer.Stop();
+
+                if (error != null)
+                {
+                    ShowPreviewFailure(text, error);
+                }
+                else
+                {
+                    CacheAndRenderDocument(document, text, useGitHubSyntax);
+                }
+            });
+        }
+
+        /// <summary>
+        /// Parses the source and rejects documents that exceed the preview's node limit.
+        /// </summary>
+        /// <param name="text">The source to parse.</param>
+        /// <param name="useGitHubSyntax">Whether to parse GitHub Markdown extensions.</param>
+        /// <returns>The parsed document, or null when it exceeds the node limit.</returns>
+        private static HtmlNode? ParseDocument(string text, bool useGitHubSyntax)
+        {
+            var document = MarkdownDocumentParser.Parse(text, useGitHubSyntax);
+
+            return document.Descendants().Take(MaximumPreviewNodeCount + 1).Count() > MaximumPreviewNodeCount
+                 ? null
+                 : document;
+        }
+
+        /// <summary>
+        /// Retains the parse result for presentation changes and renders the document.
+        /// </summary>
+        /// <param name="document">The parsed document, or null when it exceeds the node limit.</param>
+        /// <param name="text">The original Markdown source.</param>
+        /// <param name="useGitHubSyntax">The dialect used to parse the source.</param>
+        private void CacheAndRenderDocument(HtmlNode? document, string text, bool useGitHubSyntax)
+        {
+            _parsedDocument        = document;
+            _parsedSource          = text;
+            _parsedUseGitHubSyntax = useGitHubSyntax;
+
+            RenderDocument(document, text);
+        }
+
+        /// <summary>
+        /// Builds the Avalonia preview and retains requests for unchanged image destinations.
+        /// </summary>
+        /// <param name="document">The parsed document, or null when it exceeds the node limit.</param>
+        /// <param name="text">The original Markdown source used for the error fallback.</param>
+        private void RenderDocument(HtmlNode? document, string text)
+        {
+            if (document == null)
+            {
+                ShowPreviewLimit();
+                return;
+            }
+
+            CancelPreviousPreview();
+
+            try
+            {
                 _previewLifetime = new CancellationTokenSource();
 
                 var renderer = new MarkdownRenderer(
@@ -391,16 +545,26 @@ namespace BlackSharp.UI.Avalonia.Markdown.Controls
             }
             catch (Exception exception) when (exception is not OutOfMemoryException)
             {
-                ClearPreview();
-
-                _preview.Content = new SelectableTextBlock
-                {
-                    Text         = text.Length <= MaximumFallbackTextLength ? text : "Markdown preview unavailable.",
-                    TextWrapping = TextWrapping.Wrap,
-                };
-
-                Logger?.Log(LogLevel.Warn, nameof(MarkdownViewer), "The Markdown preview could not be rendered.", exception);
+                ShowPreviewFailure(text, exception);
             }
+        }
+
+        /// <summary>
+        /// Releases the preview, displays a fallback and logs the failure.
+        /// </summary>
+        /// <param name="text">The source to show if it fits the fallback limit.</param>
+        /// <param name="exception">The parsing or rendering error.</param>
+        private void ShowPreviewFailure(string text, Exception exception)
+        {
+            ClearPreview();
+
+            _preview.Content = new SelectableTextBlock
+            {
+                Text         = text.Length <= MaximumFallbackTextLength ? text : "Markdown preview unavailable.",
+                TextWrapping = TextWrapping.Wrap,
+            };
+
+            Logger?.Log(LogLevel.Warn, nameof(MarkdownViewer), "The Markdown preview could not be rendered.", exception);
         }
 
         /// <summary>
