@@ -35,6 +35,7 @@ to compare the same source in the GitHub Markdown and CommonMark previews.
 | --- | --- |
 | .NET 8  | ✅ |
 | .NET 10 | ✅ |
+| .NET 11 | ✅ |
 
 ## Requirements
 
