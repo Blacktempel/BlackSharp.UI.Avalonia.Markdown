@@ -26,18 +26,50 @@ jobs:
       matrix:
         os: [windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      TEST_FRAMEWORKS: net8.0 net10.0 net11.0
 
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Set up .NET SDKs
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
-          dotnet-version: |
-            8.0.x
-            10.0.x
-            11.0.x
+          dotnet-version: 11.0.x
+          check-latest: false
+          skip-lts-prepass: true
+
+      - name: Install missing .NET test runtimes
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtimes=$(dotnet --list-runtimes)
+          extension=sh
+          if [[ "$RUNNER_OS" == 'Windows' ]]; then extension=ps1; fi
+          installer="$RUNNER_TEMP/dotnet-install-test-runtime.$extension"
+
+          # Install the runtime for each test target that the active dotnet host cannot find.
+          for framework in $TEST_FRAMEWORKS; do
+            channel=${framework#net}
+            pattern="^Microsoft\.NETCore\.App ${channel%.*}\.${channel#*.}\.[0-9]+ "
+            if grep -Eq "$pattern" <<< "$runtimes"; then
+              continue
+            fi
+            if [[ ! -f "$installer" ]]; then
+              curl -fsSL --retry 3 "https://raw.githubusercontent.com/dotnet/install-scripts/da3ce11ba63f3dbb0fb835d41bda2665d5c48e84/src/dotnet-install.$extension" -o "$installer"
+            fi
+            if [[ "$extension" == 'ps1' ]]; then
+              pwsh -NoProfile -NonInteractive -File "$installer" -Runtime dotnet -Channel "$channel" -InstallDir "$DOTNET_ROOT" -NoPath -SkipNonVersionedFiles
+            else
+              bash "$installer" --runtime dotnet --channel "$channel" --install-dir "$DOTNET_ROOT" --no-path --skip-non-versioned-files
+            fi
+            runtimes=$(dotnet --list-runtimes)
+            if ! grep -Eq "$pattern" <<< "$runtimes"; then
+              echo "::error::The active dotnet host cannot find the .NET $channel runtime."
+              exit 1
+            fi
+          done
 
       - name: Cache NuGet packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -54,7 +86,7 @@ jobs:
         run: dotnet build BlackSharp.UI.Avalonia.Markdown.slnx -c Release --no-restore
 
       - name: Test
-        run: dotnet test BlackSharp.UI.Avalonia.Markdown.slnx -c Release --no-build --no-restore
+        run: dotnet test BlackSharp.UI.Avalonia.Markdown.slnx -c Release --no-build --no-restore -- RunConfiguration.TreatNoTestsAsError=true
 
       - name: Pack NuGet package
         if: ${{ runner.os == 'Windows' && inputs.upload_build_artifacts }}
