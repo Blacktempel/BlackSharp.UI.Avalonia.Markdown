@@ -9,10 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia.Desktop" Version="12.1.5" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.5" />
-    <PackageReference Include="BlackSharp.MVVM" Version="1.2.10" />
-    <PackageReference Include="BlackSharp.UI.Avalonia" Version="1.2.10" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.6" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.6" />
+    <PackageReference Include="BlackSharp.MVVM" Version="1.2.12" />
+    <PackageReference Include="BlackSharp.UI.Avalonia" Version="1.2.12" />
     <ProjectReference Include="../../BlackSharp.UI.Avalonia.Markdown/BlackSharp.UI.Avalonia.Markdown.csproj" />
   </ItemGroup>
 </Project>
